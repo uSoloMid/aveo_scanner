@@ -508,3 +508,13 @@ ATSTFF          → timeout máximo
 - **Flutter:** https://docs.flutter.dev
 - **Normas:** SAE J1979 (OBD2), ISO 15765 (CAN), ISO 14230 (KWP2000), SAE J2190 (modos 13/14)
 - **Comunidad rusa del Aveo T250:** drive2.ru (buscar en ruso, p. ej. "Авео Т250 ELM327")
+
+---
+
+## 📄 Licencia
+
+El código de este proyecto está bajo licencia **MIT** (ver [LICENSE](LICENSE)).
+
+Excepción: los perfiles copiados de OBDb (`assets/profiles/chevrolet_aveo.json` y derivados) conservan su licencia original **CC BY-SA 4.0**.
+
+> ⚠️ Uso bajo tu propio riesgo. Esta app solo debe leer datos; aun así, conectar cualquier dispositivo al puerto OBD2 de un carro es responsabilidad de quien lo hace.
