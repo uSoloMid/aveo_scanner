@@ -228,7 +228,7 @@ final class PidDef {
 final class PidValue { final int pid; final double value; final DateTime at; }
 ```
 Tabla v1 (exactamente la del README): `04 05 06 07 0B 0C 0D 0E 0F 10 11 1F 2F 42`. Agregar además `01` (estado de monitores: solo decodificar MIL encendido y número de DTC) y `33` (presión barométrica, `A` kPa).
-`SupportedPids` decodifica las máscaras de 32 bits (bit más significativo = PID base+1). Pruebas con máscara real ejemplo `BE3EB811` → 01,03,04,05,06,07,0B,0C,0D,0E,0F,10,11,13,15,1C,1F,20.
+`SupportedPids` decodifica las máscaras de 32 bits (bit más significativo = PID base+1). Pruebas con máscara real ejemplo `BE3EB811` → 01,03,04,05,06,07,0B,0C,0D,0E,0F,11,13,14,15,1C,20.
 Consumo: `fuelLph(maf) = maf*3600/(14.7*740)`, `kmPerL(speed, lph)` con `lph < 0.05 → null`.
 
 ---
