@@ -27,9 +27,9 @@ App propia de diagnóstico OBD2 para mi **Chevrolet Aveo 2012 (1.6L, estándar, 
 ## 📍 Estado del proyecto
 
 - [x] Escáner comprado (ELM327 mini, Bluetooth clásico, Mercado Libre)
-- [ ] Escáner validado con Car Scanner
-- [ ] Entorno Flutter instalado
-- [ ] Proyecto creado
+- [x] Escáner validado con Car Scanner (2026-10-20)
+- [x] Entorno Flutter instalado
+- [x] Proyecto creado (app de diagnóstico funcional con simulador; falta probarla en el carro)
 - [ ] Fase 2: "Hola carro" (RPM, velocidad, temperatura)
 
 ---
@@ -478,15 +478,15 @@ ATSTFF          → timeout máximo
 | Dato | Valor |
 |---|---|
 | Versión del ELM327 (`ATI`) | |
-| Protocolo (`ATDPN`) | |
+| Protocolo (`ATDPN`) | **ISO 14230-4 KWP, fast init (10.4 kbaud)** — K-Line, no CAN |
 | Voltaje en reposo (`ATRV`) | |
-| Voltaje con motor encendido | |
-| VIN (`0902`) | |
-| Calibración (`0904`) | |
+| Voltaje con motor encendido | 14.6–14.7 V |
+| VIN (`0902`) | `3G1TA5AF8CLXXXXXX` (enmascarado) |
+| Calibración (`0904`) | 47060302 |
 | PIDs soportados `0100` | |
 | PIDs soportados `0120` | |
 | PIDs soportados `0140` | |
-| Códigos de falla actuales | |
+| Códigos de falla actuales | Ninguno. MIL apagada, todos los monitores completos |
 | Módulos que responden | |
 
 ### PIDs modo 22 verificados

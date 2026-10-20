@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "mx.solomid.aveo_scanner"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android requires compiling against API 37.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
