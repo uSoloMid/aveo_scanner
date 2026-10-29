@@ -1,0 +1,4 @@
+version: 1
+bundleID: mx.solomid.AveoRalenti
+infoPath: Info.plist
+product: AveoRalenti
