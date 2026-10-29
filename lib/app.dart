@@ -6,6 +6,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:aveo_scanner/ui/backup_screen.dart';
 import 'package:aveo_scanner/ui/connect_screen.dart';
 import 'package:aveo_scanner/ui/dashboard_screen.dart';
+import 'package:aveo_scanner/ui/diagnostic_screen.dart';
 import 'package:aveo_scanner/ui/dtc_screen.dart';
 import 'package:aveo_scanner/ui/providers.dart';
 import 'package:aveo_scanner/ui/terminal_screen.dart';
@@ -36,6 +37,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   static const _destinations = <NavigationDestination>[
     NavigationDestination(icon: Icon(Icons.bluetooth), label: 'Conectar'),
     NavigationDestination(icon: Icon(Icons.dashboard), label: 'Tablero'),
+    NavigationDestination(icon: Icon(Icons.troubleshoot), label: 'Diagnóstico'),
     NavigationDestination(icon: Icon(Icons.warning_amber), label: 'Fallas'),
     NavigationDestination(icon: Icon(Icons.backup), label: 'Respaldo'),
     NavigationDestination(icon: Icon(Icons.terminal), label: 'Terminal'),
@@ -44,8 +46,9 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget _page(int index) => switch (index) {
     0 => const ConnectScreen(),
     1 => const DashboardScreen(),
-    2 => const DtcScreen(),
-    3 => const BackupScreen(),
+    2 => const DiagnosticScreen(),
+    3 => const DtcScreen(),
+    4 => const BackupScreen(),
     _ => const TerminalScreen(),
   };
 

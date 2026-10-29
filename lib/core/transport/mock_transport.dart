@@ -191,6 +191,19 @@ final class MockTransport implements Transport {
       _respond([0x62, 0x00, 0x0D, 0x32]);
       return;
     }
+    if (cmd == '221192') {
+      // Desired idle: 0x42 * 12.5 = 825 rpm.
+      _respond([0x62, 0x11, 0x92, 0x42]);
+      return;
+    }
+    if (cmd == '221170') {
+      _respond([0x62, 0x11, 0x70, 0x27]);
+      return;
+    }
+    if (cmd == '221172') {
+      _respond([0x62, 0x11, 0x72, engineRunning ? 0x2F : 0x3D]);
+      return;
+    }
     if (cmd == '2211A1') {
       _respond([0x62, 0x11, 0xA1, 1, 0xFF]);
       return;
@@ -199,6 +212,10 @@ final class MockTransport implements Transport {
       final int pid = int.parse(cmd.substring(2, 4), radix: 16);
       final List<int> data = switch (pid) {
         1 => [0x41, pid, 0x00, 0x00, 0x00, 0x00],
+        3 => [0x41, pid, 0x02, 0x00],
+        69 => [0x41, pid, 0x00],
+        20 => [0x41, pid, 0x90, 0xFF],
+        21 => [0x41, pid, 0x1C, 0xFF],
         12 => [0x41, pid, ..._word(_rpm() * 4)],
         13 => [0x41, pid, _speed()],
         5 => [

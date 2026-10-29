@@ -3,6 +3,7 @@ import 'package:aveo_scanner/core/elm327/elm_response.dart';
 import 'package:aveo_scanner/core/elm327/response_parser.dart';
 import 'package:aveo_scanner/core/safety/command_guard.dart';
 import 'package:aveo_scanner/obd/dtc.dart';
+import 'package:aveo_scanner/obd/gm_pids.dart';
 import 'package:aveo_scanner/obd/pid.dart';
 import 'package:aveo_scanner/obd/supported_pids.dart';
 import 'package:aveo_scanner/obd/vehicle_info.dart';
@@ -41,6 +42,36 @@ class ObdService {
       }
     }
     return values;
+  }
+
+  /// Battery voltage as measured by the adapter (`ATRV`), e.g. "14.7V".
+  Future<double?> readAdapterVoltage() async {
+    final ElmResponse r = await elm.send('ATRV');
+    return double.tryParse(
+      (r.text ?? '').replaceAll(RegExp(r'[^0-9.]'), ''),
+    );
+  }
+
+  /// Reads one GM mode 22 value. Returns null on NO DATA, a negative
+  /// response or a payload shorter than the definition expects.
+  Future<double?> readGm(GmPidDef def) async {
+    final List<int>? payload = await probeMode22(def.id);
+    if (payload == null || payload.length < def.bytes) {
+      return null;
+    }
+    return def.decode(payload.sublist(0, def.bytes));
+  }
+
+  /// Sends `22XXXX` and returns the raw data bytes after `62 XX XX`, or null
+  /// when the ECU does not support that identifier. Read-only by design.
+  Future<List<int>?> probeMode22(int id) async {
+    final String command =
+        '22${id.toRadixString(16).padLeft(4, '0').toUpperCase()}';
+    final ElmResponse r = await elm.send(command);
+    if (r.messages.isEmpty || r.isNegative) {
+      return null;
+    }
+    return mode22Payload([for (final EcuMessage m in r.messages) m.data], id);
   }
 
   Future<SupportedPids> readSupportedPids() async {

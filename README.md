@@ -31,6 +31,8 @@ App propia de diagnóstico OBD2 para mi **Chevrolet Aveo 2012 (1.6L, estándar, 
 - [x] Entorno Flutter instalado
 - [x] Proyecto creado (app de diagnóstico funcional con simulador; falta probarla en el carro)
 - [ ] Fase 2: "Hola carro" (RPM, velocidad, temperatura)
+- [x] Modo 22 de GM confirmado en el carro con terminal (ralentí deseado e IAC)
+- [ ] Pestaña **Diagnóstico** (grabadora CSV + escáner modo 22) probada en el carro
 
 ---
 
@@ -477,9 +479,9 @@ ATSTFF          → timeout máximo
 
 | Dato | Valor |
 |---|---|
-| Versión del ELM327 (`ATI`) | |
+| Versión del ELM327 (`ATI`) | ELM327 v2.1 (clon) |
 | Protocolo (`ATDPN`) | **ISO 14230-4 KWP, fast init (10.4 kbaud)** — K-Line, no CAN |
-| Voltaje en reposo (`ATRV`) | |
+| Voltaje en reposo (`ATRV`) | 12.1–12.5 V (bajo; batería por revisar) |
 | Voltaje con motor encendido | 14.6–14.7 V |
 | VIN (`0902`) | `3G1TA5AF8CLXXXXXX` (enmascarado) |
 | Calibración (`0904`) | 47060302 |
@@ -487,14 +489,24 @@ ATSTFF          → timeout máximo
 | PIDs soportados `0120` | |
 | PIDs soportados `0140` | |
 | Códigos de falla actuales | Ninguno. MIL apagada, todos los monitores completos |
+| Computadora (ECU) | Delphi MR-140 / HV-240 (motor F16D3), responde en `F1 ← 11` |
+| Inicio de K-Line | El primer comando suele dar `BUS INIT: ERROR`; al segundo intento responde |
 | Módulos que responden | |
 
 ### PIDs modo 22 verificados
 | Comando | ¿Responde? | Valor de ejemplo | Notas |
 |---|---|---|---|
+| `221192` | ✅ | `62 11 92 41` → 812 rpm (caliente) · `42` → 825 rpm (frío) | Ralentí deseado = A × 12.5. Escala confirmada: pidió 812, real 847 |
+| `221172` | ✅ | `62 11 72 25` → 37 (caliente) · `2F` → 47 (frío, 1472 rpm) · `3D` → 61 (llave ON, motor apagado) | Posición IAC en pasos |
 | `22000D` | | | |
 | `2211A1` | | | |
 | `221200` | | | |
+
+### Caso: ralentí alto en frío (oct 2026)
+- En frío se queda en 1400–1650 rpm con avance ~33° (normal en ralentí: 3–4°), mariposa 10.98 % (cerrada) y sin códigos.
+- La computadora pide ~825 rpm mientras el motor va a ~1470 → entra aire que la ECU no controla.
+- En caliente todo normal (812 pedido / 847 real, IAC 37). Volante, pedal y A/C no lo disparan.
+- Siguiente: registrar con la pestaña **Diagnóstico** para ver si la IAC baja mientras las RPM siguen altas.
 
 ---
 

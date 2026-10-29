@@ -54,7 +54,7 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
       return 'No hubo respuesta del vehículo. Enciende el contacto y vuelve a intentar.';
     }
     if (message.contains('NO_PERMISSION')) {
-      return 'Falta permiso de Bluetooth. Autorízalo en Ajustes de la aplicación.';
+      return 'Falta permiso de Bluetooth. En Ajustes > Apps > Aveo Scanner > Permisos, permite "Dispositivos cercanos". Detalle: $message';
     }
     if (message.contains('CONNECT_FAILED')) {
       return 'No se pudo conectar. Verifica que el ELM327 esté emparejado y libre.';

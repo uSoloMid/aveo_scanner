@@ -213,7 +213,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               crossAxisCount: MediaQuery.sizeOf(context).width > 700 ? 3 : 2,
-              childAspectRatio: 1.7,
+              childAspectRatio: 1.3,
               children: [
                 for (final pid in extras) _tile(pid, _values[pid]?.value),
               ],

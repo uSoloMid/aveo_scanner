@@ -6,6 +6,10 @@ void main() {
   test('decodes each standard PID formula', () {
     final Map<int, List<int>> samples = {
       1: [0x82, 0, 0, 0],
+      3: [0x02, 0x00],
+      69: [0x0B],
+      20: [0x90, 0xFF],
+      21: [0x1C, 0xFF],
       4: [255],
       5: [90],
       6: [0],
@@ -34,6 +38,9 @@ void main() {
     expect(standardPids[5]!.decode(samples[5]!), 50);
     expect(standardPids[16]!.decode(samples[16]!), 1);
     expect(standardPids[66]!.decode(samples[66]!), 14.1);
+    expect(standardPids[20]!.decode(samples[20]!), 0.72);
+    expect(standardPids[3]!.decode(samples[3]!), 2);
+    expect(standardPids[69]!.decode(samples[69]!), closeTo(4.31, 0.01));
   });
   test('decodes README RPM and elapsed-time examples', () {
     expect(standardPids[12]!.decode([0x1a, 0xf8]), 1726);

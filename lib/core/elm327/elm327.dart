@@ -180,10 +180,21 @@ class Elm327 {
     await _sendOptional('ATAT1');
     _requireInitSuccess(await send('ATSP0'), 'ATSP0');
     final ElmResponse version = await send('ATI');
-    final ElmResponse supported = await send(
+    ElmResponse supported = await send(
       '0100',
       timeout: const Duration(seconds: 6),
     );
+    // On the Aveo's K-Line the first slow/fast init often fails with
+    // "BUS INIT: ERROR" and succeeds on the second try (seen 2026-10-22).
+    for (
+      int attempt = 0;
+      attempt < 2 &&
+          supported.error == null &&
+          !supported.raw.replaceAll(RegExp(r'\s'), '').contains('4100');
+      attempt++
+    ) {
+      supported = await send('0100', timeout: const Duration(seconds: 6));
+    }
     if (supported.error == ElmError.unableToConnect) {
       throw const ElmInitException('¿Está el contacto encendido?');
     }

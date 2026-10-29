@@ -5,6 +5,42 @@ int _ab(List<int> d) => d[0] * 256 + d[1];
 final Map<int, PidDef> standardPids = {
   for (final PidDef p in <PidDef>[
     const PidDef(
+      pid: 3,
+      nameEs: 'Estado de combustible',
+      unit: '',
+      bytes: 1,
+      decode: _aD,
+      min: 0,
+      max: 255,
+    ),
+    const PidDef(
+      pid: 20,
+      nameEs: 'Sensor O2 1',
+      unit: 'V',
+      bytes: 2,
+      decode: _o2Volts,
+      min: 0,
+      max: 1.275,
+    ),
+    const PidDef(
+      pid: 21,
+      nameEs: 'Sensor O2 2',
+      unit: 'V',
+      bytes: 2,
+      decode: _o2Volts,
+      min: 0,
+      max: 1.275,
+    ),
+    const PidDef(
+      pid: 69,
+      nameEs: 'Mariposa relativa',
+      unit: '%',
+      bytes: 1,
+      decode: _load,
+      min: 0,
+      max: 100,
+    ),
+    const PidDef(
       pid: 4,
       nameEs: 'Carga del motor',
       unit: '%',
@@ -159,6 +195,7 @@ double _rpm(List<int> d) => _ab(d) / 4;
 double _speed(List<int> d) => _a(d).toDouble();
 double _advance(List<int> d) => _a(d) / 2 - 64;
 double _maf(List<int> d) => _ab(d) / 100;
+double _o2Volts(List<int> d) => _a(d) / 200;
 double _abD(List<int> d) => _ab(d).toDouble();
 double _voltage(List<int> d) => _ab(d) / 1000;
 double _monitor(List<int> d) =>

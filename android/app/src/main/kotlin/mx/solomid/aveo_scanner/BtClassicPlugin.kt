@@ -91,7 +91,9 @@ class BtClassicPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventCha
                 replyError(result, "NO_PERMISSION", "Falta el permiso Bluetooth para conectar.")
                 return
             }
-            adapter.cancelDiscovery()
+            // cancelDiscovery() needs BLUETOOTH_SCAN on Android 12+. It is only an
+            // optimization (we never start discovery), so skip it if not granted.
+            try { adapter.cancelDiscovery() } catch (_: SecurityException) { }
             closeSocket()
             val device = adapter.getRemoteDevice(address)
             val connected = trySocket { device.createRfcommSocketToServiceRecord(SPP_UUID) }

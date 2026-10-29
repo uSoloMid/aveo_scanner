@@ -14,7 +14,14 @@ enum BluetoothPermissionResult {
 
 /// Requests Android's Bluetooth connect permission before listing paired devices.
 Future<BluetoothPermissionResult> requestBluetoothConnectPermission() async {
-  final status = await Permission.bluetoothConnect.request();
+  // Ask for both "Nearby devices" permissions in one dialog: CONNECT opens
+  // the socket, SCAN is needed by some adapter calls on Android 12+.
+  final Map<Permission, PermissionStatus> statuses = await [
+    Permission.bluetoothConnect,
+    Permission.bluetoothScan,
+  ].request();
+  final PermissionStatus status =
+      statuses[Permission.bluetoothConnect] ?? PermissionStatus.denied;
   return switch (status) {
     PermissionStatus.granted ||
     PermissionStatus.limited => BluetoothPermissionResult.granted,
