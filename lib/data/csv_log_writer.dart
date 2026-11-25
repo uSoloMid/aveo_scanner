@@ -37,8 +37,8 @@ Future<Directory> logsDirectory() async {
 }
 
 /// Saved logs, newest first.
-Future<List<File>> listLogs() async {
-  final Directory dir = await logsDirectory();
+Future<List<File>> listLogs({Directory? directory}) async {
+  final Directory dir = directory ?? await logsDirectory();
   final List<File> files = [];
   await for (final FileSystemEntity e in dir.list()) {
     if (e is File && e.path.endsWith('.csv')) files.add(e);
@@ -61,8 +61,9 @@ String clockStamp(DateTime t) {
       '${t.millisecond.toString().padLeft(3, '0')}';
 }
 
-String csvCell(String value) =>
-    value.contains(RegExp(r'[",\n]')) ? '"${value.replaceAll('"', '""')}"' : value;
+String csvCell(String value) => value.contains(RegExp(r'[",\r\n]'))
+    ? '"${value.replaceAll('"', '""')}"'
+    : value;
 
 /// Pure formatting, kept separate from file IO so it is unit-testable.
 final class RecorderCsvFormat {
@@ -74,6 +75,9 @@ final class RecorderCsvFormat {
     'evento',
     'ralenti_alto',
     for (final RecorderChannel c in channels) c.key,
+    'fecha_hora',
+    'evaluacion_disponible',
+    for (final RecorderChannel c in channels) '${c.key}_leido_en',
   ].join(',');
 
   String row(RecorderSample s) => [
@@ -81,6 +85,10 @@ final class RecorderCsvFormat {
     csvCell(s.events.join(' | ')),
     s.highIdle ? '1' : '0',
     for (final RecorderChannel c in channels) _number(s[c.key]),
+    s.at.toIso8601String(),
+    s.canEvaluate ? '1' : '0',
+    for (final RecorderChannel c in channels)
+      s.readAt[c.key]?.toIso8601String() ?? '',
   ].join(',');
 
   String _number(double? v) {
@@ -92,6 +100,7 @@ final class RecorderCsvFormat {
 /// Appends recorder samples to a CSV file, flushing every row so a crash or
 /// a dead battery loses at most one second of data.
 final class CsvLogWriter {
+  static final Set<String> activePaths = {};
   CsvLogWriter._(this.file, this._sink, this._format);
 
   static Future<CsvLogWriter> create(
@@ -107,6 +116,7 @@ final class CsvLogWriter {
     final RecorderCsvFormat format = RecorderCsvFormat(channels);
     sink.writeln(format.header());
     await sink.flush();
+    activePaths.add(file.path);
     return CsvLogWriter._(file, sink, format);
   }
 
@@ -114,20 +124,41 @@ final class CsvLogWriter {
   final IOSink _sink;
   final RecorderCsvFormat _format;
   int rows = 0;
+  int pendingWrites = 0;
+  Object? writeError;
   Future<void> _tail = Future<void>.value();
 
   /// Writes are chained: IOSink rejects a write while a flush is pending.
   Future<void> add(RecorderSample sample) {
     final String line = _format.row(sample);
-    rows++;
+    if (writeError != null) return Future.error(writeError!);
+    if (pendingWrites >= 32) {
+      return Future.error(StateError('Guardado atrasado: detén la grabación'));
+    }
+    pendingWrites++;
     return _tail = _tail.then((_) async {
-      _sink.writeln(line);
-      await _sink.flush();
+      try {
+        _sink.writeln(line);
+        await _sink.flush();
+        rows++;
+      } on Object catch (error) {
+        writeError = error;
+        rethrow;
+      } finally {
+        pendingWrites--;
+      }
     });
   }
 
   Future<void> close() async {
-    await _tail;
-    await _sink.close();
+    try {
+      await _tail;
+    } finally {
+      try {
+        await _sink.close();
+      } finally {
+        activePaths.remove(file.path);
+      }
+    }
   }
 }

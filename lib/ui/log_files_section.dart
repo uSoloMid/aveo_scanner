@@ -5,28 +5,32 @@ import 'package:path/path.dart' as path;
 import 'package:share_plus/share_plus.dart';
 import 'package:aveo_scanner/data/csv_log_writer.dart';
 
-/// Opens Android's share sheet (WhatsApp, Gmail, Drive, Claude…) for a log.
-Future<void> shareLog(File file) => SharePlus.instance.share(
-  ShareParams(
-    files: [XFile(file.path, mimeType: 'text/csv')],
-    text: 'Registro Aveo Scanner: ${path.basename(file.path)}',
-  ),
-);
+Future<void> shareLogs(List<File> files) async {
+  if (files.isEmpty) return;
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [for (final f in files) XFile(f.path, mimeType: 'text/csv')],
+      text: 'Registros Aveo Scanner (${files.length})',
+    ),
+  );
+}
 
-/// Lists saved CSV logs with a share button each. Call [refresh] through a
-/// [GlobalKey] after a recording or scan finishes.
+Future<void> shareLog(File file) => shareLogs([file]);
+
 class LogFilesSection extends StatefulWidget {
-  const LogFilesSection({super.key});
-
+  const LogFilesSection({super.key, this.directory, this.standalone = false});
+  final Directory? directory;
+  final bool standalone;
   @override
   State<LogFilesSection> createState() => LogFilesSectionState();
 }
 
 class LogFilesSectionState extends State<LogFilesSection> {
   List<File> _files = const [];
-  String? _folder;
+  final Set<String> _selected = {};
+  final Map<String, int> _sizes = {};
   String? _error;
-
+  bool _busy = false;
   @override
   void initState() {
     super.initState();
@@ -35,30 +39,85 @@ class LogFilesSectionState extends State<LogFilesSection> {
 
   Future<void> refresh() async {
     try {
-      final Directory dir = await logsDirectory();
-      final List<File> files = await listLogs();
+      final files = await listLogs(directory: widget.directory);
+      final sizes = <String, int>{};
+      for (final f in files) {
+        sizes[f.path] = await f.length();
+      }
       if (!mounted) return;
       setState(() {
-        _folder = dir.path;
         _files = files;
+        _sizes
+          ..clear()
+          ..addAll(sizes);
+        _selected.removeWhere(
+          (p) =>
+              !files.any((f) => f.path == p) ||
+              CsvLogWriter.activePaths.contains(p),
+        );
         _error = null;
       });
-    } on Object catch (error) {
-      if (mounted) setState(() => _error = 'No se pudo leer la carpeta: $error');
+    } on Object catch (e) {
+      if (mounted) {
+        setState(() => _error = 'No se pudieron leer los registros: $e');
+      }
     }
   }
 
-  Future<void> _share(File file) async {
+  List<File> get _chosen =>
+      _files.where((f) => _selected.contains(f.path)).toList();
+  Future<void> _share(List<File> files) async {
     try {
-      await shareLog(file);
-    } on Object catch (error) {
-      if (mounted) setState(() => _error = 'No se pudo compartir: $error');
+      await shareLogs(files);
+    } on Object catch (e) {
+      if (mounted) setState(() => _error = 'No se pudo compartir: $e');
     }
   }
 
-  String _size(File f) {
-    final int bytes = f.lengthSync();
-    return bytes < 1024 ? '$bytes B' : '${(bytes / 1024).toStringAsFixed(0)} KB';
+  Future<void> _delete() async {
+    final files = _chosen
+        .where((f) => !CsvLogWriter.activePaths.contains(f.path))
+        .toList();
+    if (files.isEmpty) return;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('¿Eliminar ${files.length} registros?'),
+        content: const Text(
+          'Se eliminarán del celular. Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (yes != true || !mounted) return;
+    setState(() => _busy = true);
+    final failed = <String>[];
+    for (final f in files) {
+      if (CsvLogWriter.activePaths.contains(f.path)) continue;
+      try {
+        await f.delete();
+      } on Object {
+        failed.add(path.basename(f.path));
+      }
+    }
+    await refresh();
+    if (mounted) {
+      setState(() {
+        _busy = false;
+        if (failed.isNotEmpty) {
+          _error = 'No se pudieron eliminar: ${failed.join(', ')}';
+        }
+      });
+    }
   }
 
   @override
@@ -69,30 +128,85 @@ class LogFilesSectionState extends State<LogFilesSection> {
         children: [
           Expanded(
             child: Text(
-              'Mis registros',
+              widget.standalone
+                  ? '${_files.length} registros'
+                  : 'Mis registros (${_files.length})',
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
           IconButton(
-            onPressed: refresh,
+            onPressed: _busy ? null : refresh,
             icon: const Icon(Icons.refresh),
             tooltip: 'Actualizar',
           ),
         ],
       ),
-      if (_folder != null) Text('Carpeta: $_folder'),
-      if (_error != null) Text(_error ?? ''),
-      if (_files.isEmpty) const Text('Todavía no hay registros.'),
-      for (final File f in _files.take(20))
-        Card(
-          child: ListTile(
-            title: Text(path.basename(f.path)),
-            subtitle: Text(_size(f)),
-            trailing: FilledButton.icon(
-              onPressed: () => _share(f),
-              icon: const Icon(Icons.share),
-              label: const Text('Compartir'),
+      if (_files.isNotEmpty)
+        Wrap(
+          spacing: 8,
+          children: [
+            TextButton(
+              onPressed: _busy
+                  ? null
+                  : () => setState(() {
+                      final available = _files.where(
+                        (f) => !CsvLogWriter.activePaths.contains(f.path),
+                      );
+                      if (_selected.length == available.length) {
+                        _selected.clear();
+                      } else {
+                        _selected.addAll(available.map((f) => f.path));
+                      }
+                    }),
+              child: const Text('Seleccionar todos / ninguno'),
             ),
+            TextButton.icon(
+              onPressed: _busy || _selected.isEmpty
+                  ? null
+                  : () => _share(_chosen),
+              icon: const Icon(Icons.share),
+              label: Text('Compartir (${_selected.length})'),
+            ),
+            TextButton.icon(
+              onPressed: _busy || _selected.isEmpty ? null : _delete,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Eliminar seleccionados'),
+            ),
+          ],
+        ),
+      if (_error != null)
+        Text(
+          _error!,
+          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ),
+      if (_files.isEmpty) const Text('Todavía no hay registros.'),
+      for (final f in _files)
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Checkbox(
+            value: _selected.contains(f.path),
+            onChanged: _busy || CsvLogWriter.activePaths.contains(f.path)
+                ? null
+                : (value) => setState(() {
+                    if (value == true) {
+                      _selected.add(f.path);
+                    } else {
+                      _selected.remove(f.path);
+                    }
+                  }),
+          ),
+          title: Text(path.basename(f.path)),
+          subtitle: Text(
+            CsvLogWriter.activePaths.contains(f.path)
+                ? 'Grabando · archivo protegido'
+                : '${((_sizes[f.path] ?? 0) / 1024).toStringAsFixed(1)} KB',
+          ),
+          trailing: IconButton(
+            onPressed: CsvLogWriter.activePaths.contains(f.path)
+                ? null
+                : () => _share([f]),
+            icon: const Icon(Icons.share),
+            tooltip: 'Compartir este registro',
           ),
         ),
     ],

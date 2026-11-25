@@ -62,6 +62,28 @@ void main() {
     expect(transport.writes, ['ATZ', 'ATI']);
     await elm.close();
   });
+  test(
+    'bounds queued work and reports elapsed, wire and parsing times',
+    () async {
+      final transport = SpyTransport();
+      final elm = Elm327(transport, delay: (_) async {});
+      final metrics = <dynamic>[];
+      final subscription = elm.metrics.listen(metrics.add);
+      final pending = [for (var i = 0; i < 32; i++) elm.send('ATI')];
+      await expectLater(elm.send('ATI'), throwsStateError);
+      await Future.wait(pending);
+      await Future<void>.delayed(Duration.zero);
+      expect(transport.writes.length, 32);
+      expect(metrics.length, 32);
+      expect(metrics.first.firstByteMs, isNotNull);
+      expect(metrics.first.wireMs, greaterThanOrEqualTo(0));
+      expect(metrics.first.parseMs, greaterThanOrEqualTo(0));
+      expect(elm.pendingQueries, 0);
+      await subscription.cancel();
+      await elm.close();
+    },
+  );
+
   test('requires matching confirmation', () async {
     final SpyTransport transport = SpyTransport();
     final Elm327 elm = Elm327(transport, delay: (_) async {});

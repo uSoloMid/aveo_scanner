@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:aveo_scanner/data/database.dart';
 import 'package:aveo_scanner/app.dart';
+import 'package:aveo_scanner/ui/diagnostic_screen.dart';
 import 'package:aveo_scanner/ui/providers.dart';
 
 void main() {
@@ -37,6 +38,18 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     expect(find.text('RPM'), findsOneWidget);
     expect(find.text('0'), findsWidgets);
+    final diagnosticState = tester.state(
+      find.byType(DiagnosticScreen, skipOffstage: false),
+    );
+    await tester.tap(find.byIcon(Icons.folder_open));
+    await tester.pump();
+    expect(
+      tester.state(find.byType(DiagnosticScreen, skipOffstage: false)),
+      same(diagnosticState),
+    );
+    await tester.tap(find.byIcon(Icons.troubleshoot));
+    await tester.pump();
+    expect(tester.state(find.byType(DiagnosticScreen)), same(diagnosticState));
     await tester.pumpWidget(const SizedBox.shrink());
     await database.close();
   });

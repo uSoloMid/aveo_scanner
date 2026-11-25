@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:aveo_scanner/core/elm327/query_metric.dart';
+
 import 'package:aveo_scanner/core/safety/command_guard.dart';
 import 'package:aveo_scanner/core/transport/transport.dart';
 import 'package:aveo_scanner/core/elm327/elm_response.dart';
@@ -22,9 +24,25 @@ class Elm327 {
        // ignore: prefer_initializing_formals
        _latePromptTimeout = latePromptTimeout {
     _parser = ResponseParser(log: this.log);
-    _subscription = transport.incoming.listen(_onData);
+    _subscription = transport.incoming.listen(
+      _onData,
+      onError: (Object error) {
+        final pending = _pending;
+        if (pending != null && !pending.isCompleted) {
+          pending.completeError(error);
+        }
+      },
+    );
   }
   final Transport transport;
+  int preferredAdaptive = 1;
+  String preferredTimeoutHex = '32';
+  Duration minimumGap = const Duration(milliseconds: 50);
+  final StreamController<QueryMetric> _metrics = StreamController.broadcast();
+  Stream<QueryMetric> get metrics => _metrics.stream;
+  int queued = 0;
+  int get pendingQueries => queued;
+
   final TrafficLog log;
   final Clock _clock;
   final Future<void> Function(Duration) _delay;
@@ -37,11 +55,17 @@ class Elm327 {
   int _pendingCount = 0;
   String _responseParts = '';
   String _buffer = '';
+  Stopwatch? _wireWatch;
+  double? _firstByteMs;
+  double _wireMs = 0, _parseMs = 0;
   bool _discardLate = false;
   DateTime? _lastEnd;
   Future<void> _tail = Future<void>.value();
   ProtocolFamily protocolFamily = ProtocolFamily.can11;
   void _onData(List<int> bytes) {
+    if (bytes.isNotEmpty && _pending != null && _firstByteMs == null) {
+      _firstByteMs = (_wireWatch?.elapsedMicroseconds ?? 0) / 1000;
+    }
     for (final int byte in bytes) {
       final String char = String.fromCharCode(byte);
       if (_discardLate) {
@@ -76,6 +100,17 @@ class Elm327 {
         _buffer = '';
       } else {
         _buffer += char;
+        if (_buffer.length > 65536) {
+          final pending = _pending;
+          if (pending != null && !pending.isCompleted) {
+            pending.completeError(
+              StateError('Respuesta del adaptador demasiado larga'),
+            );
+          }
+          _buffer = '';
+          _discardLate = true;
+          _lateDrain = Completer<void>();
+        }
       }
     }
   }
@@ -102,11 +137,52 @@ class Elm327 {
       return Future.error(ConfirmationRequiredException(check));
     }
     final Completer<ElmResponse> result = Completer<ElmResponse>();
+    if (queued >= 32) {
+      return Future.error(StateError('Cola de consultas llena'));
+    }
+    queued++;
+    final queuedAt = Stopwatch()..start();
     _tail = _tail.then((_) async {
       try {
-        result.complete(await _send(check.normalized, timeout));
+        final queueMs = queuedAt.elapsedMicroseconds / 1000;
+        final watch = Stopwatch()..start();
+        try {
+          final response = await _send(check.normalized, timeout);
+          _metrics.add(
+            QueryMetric(
+              command: check.normalized,
+              at: _clock(),
+              queueMs: queueMs,
+              elapsedMs: watch.elapsedMicroseconds / 1000,
+              raw: response.raw,
+              firstByteMs: _firstByteMs,
+              wireMs: _wireMs,
+              parseMs: _parseMs,
+              error:
+                  response.error?.name ??
+                  (response.isNegative
+                      ? 'negative_${response.negativeCode}'
+                      : null),
+            ),
+          );
+          result.complete(response);
+        } on Object catch (e) {
+          _metrics.add(
+            QueryMetric(
+              command: check.normalized,
+              at: _clock(),
+              queueMs: queueMs,
+              elapsedMs: watch.elapsedMicroseconds / 1000,
+              raw: '',
+              error: e.runtimeType.toString(),
+            ),
+          );
+          rethrow;
+        }
       } on Object catch (e, st) {
         result.completeError(e, st);
+      } finally {
+        queued--;
       }
     });
     return result.future;
@@ -126,8 +202,8 @@ class Elm327 {
     final DateTime? lastEnd = _lastEnd;
     if (lastEnd != null) {
       final Duration elapsed = _clock().difference(lastEnd);
-      if (elapsed < const Duration(milliseconds: 50)) {
-        await _delay(const Duration(milliseconds: 50) - elapsed);
+      if (elapsed < minimumGap) {
+        await _delay(minimumGap - elapsed);
       }
     }
     _buffer = '';
@@ -137,6 +213,10 @@ class Elm327 {
     _timeoutTimer?.cancel();
     _timeoutTimer = Timer(timeout, _timeoutPending);
     log.add(Direction.tx, command);
+    _firstByteMs = null;
+    _wireMs = 0;
+    _parseMs = 0;
+    _wireWatch = Stopwatch()..start();
     try {
       await transport.write(ascii.encode('$command\r'));
     } on Object {
@@ -158,12 +238,25 @@ class Elm327 {
       _pending = null;
       _lastEnd = _clock();
       throw const ElmTimeoutException();
+    } on Object {
+      _timeoutTimer?.cancel();
+      _pending = null;
+      _lastEnd = _clock();
+      rethrow;
     }
     _pending = null;
     _timeoutTimer?.cancel();
     _lastEnd = _clock();
     log.add(Direction.rx, raw);
-    return _parser.parse(raw, protocol: protocolFamily, command: command);
+    _wireMs = _wireWatch!.elapsedMicroseconds / 1000;
+    final parseWatch = Stopwatch()..start();
+    final parsed = _parser.parse(
+      raw,
+      protocol: protocolFamily,
+      command: command,
+    );
+    _parseMs = parseWatch.elapsedMicroseconds / 1000;
+    return parsed;
   }
 
   Future<ElmInfo> initialize() async {
@@ -177,7 +270,8 @@ class Elm327 {
     await _sendOptional('ATL0');
     await _sendOptional('ATS0');
     _requireInitSuccess(await send('ATH1'), 'ATH1');
-    await _sendOptional('ATAT1');
+    await _sendOptional('ATST$preferredTimeoutHex');
+    await _sendOptional('ATAT$preferredAdaptive');
     _requireInitSuccess(await send('ATSP0'), 'ATSP0');
     final ElmResponse version = await send('ATI');
     ElmResponse supported = await send(
@@ -212,6 +306,11 @@ class Elm327 {
       command: '0100',
     );
     _requireInitSuccess(parsedSupported, '0100');
+    if (parsedSupported.messages.isEmpty) {
+      throw const ElmInitException(
+        'El adaptador responde, pero no hay datos de la ECU.',
+      );
+    }
     final ElmResponse voltage = await send('ATRV');
     return ElmInfo(
       version: version.text ?? reset.text ?? '',
@@ -257,6 +356,7 @@ class Elm327 {
   Future<void> close() async {
     _timeoutTimer?.cancel();
     await _subscription.cancel();
+    await _metrics.close();
     await transport.disconnect();
   }
 }

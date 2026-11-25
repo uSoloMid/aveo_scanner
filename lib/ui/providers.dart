@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:aveo_scanner/core/transport/transport.dart';
 import 'package:aveo_scanner/core/transport/mock_transport.dart';
 import 'package:aveo_scanner/core/transport/bt_classic_transport.dart';
@@ -12,6 +14,17 @@ import 'package:aveo_scanner/obd/obd_service.dart';
 import 'package:aveo_scanner/data/database.dart';
 import 'package:aveo_scanner/data/session_repository.dart';
 import 'package:aveo_scanner/data/backup_repository.dart';
+
+final appVersionProvider = FutureProvider<String?>((ref) async {
+  try {
+    final info = await PackageInfo.fromPlatform();
+    return '${info.version}+${info.buildNumber}';
+  } on MissingPluginException {
+    return null;
+  } on PlatformException {
+    return null;
+  }
+});
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
   final AppDatabase value = AppDatabase();
@@ -156,3 +169,16 @@ final terminalSenderProvider = Provider<Future<ElmResponse> Function(String)>(
     return connection.elm.send(command);
   },
 );
+
+// One acquisition owner prevents dashboard, terminal and tests competing for ECU time.
+final acquisitionProvider = NotifierProvider<AcquisitionNotifier, String?>(
+  AcquisitionNotifier.new,
+);
+
+class AcquisitionNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? value) {
+    if (ref.mounted) state = value;
+  }
+}

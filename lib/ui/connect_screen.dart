@@ -66,6 +66,7 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
   Widget build(BuildContext context) {
     final connection = ref.watch(connectionProvider);
     final devices = ref.watch(bondedDevicesProvider);
+    final version = ref.watch(appVersionProvider).asData?.value;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Aveo Scanner'),
@@ -87,6 +88,11 @@ class _ConnectScreenState extends ConsumerState<ConnectScreen> {
             connection == null ? 'Conecta tu adaptador' : 'Conectado',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
+          if (version != null)
+            Text(
+              'Versión de la app $version',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           const SizedBox(height: 12),
           Card(
             child: ListTile(

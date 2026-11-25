@@ -1,11 +1,29 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aveo_scanner/core/elm327/elm327.dart';
+import 'package:aveo_scanner/core/elm327/elm_response.dart';
 import 'package:aveo_scanner/core/safety/command_guard.dart';
 import 'package:aveo_scanner/core/transport/mock_transport.dart';
 import 'package:aveo_scanner/obd/dtc.dart';
 import 'package:aveo_scanner/obd/obd_service.dart';
 
+class WrongPidElm extends Elm327 {
+  WrongPidElm() : super(MockTransport());
+  @override
+  Future<ElmResponse> send(
+    String cmd, {
+    Duration timeout = const Duration(seconds: 2),
+    Confirmation? confirmation,
+  }) async => ElmResponse.messages([
+    const EcuMessage(ecu: '7E8', data: [0x41, 0x0D, 0x10, 0x20]),
+  ]);
+}
+
 void main() {
+  test('does not decode a late answer for another PID as RPM', () async {
+    final elm = WrongPidElm();
+    expect(await ObdService(elm).readPids([12]), isEmpty);
+    await elm.close();
+  });
   test(
     'reads standard PIDs, supported masks, DTCs, and mode 09 identifiers',
     () async {

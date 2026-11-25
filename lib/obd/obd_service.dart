@@ -31,7 +31,9 @@ class ObdService {
       }
       for (final EcuMessage m in r.messages) {
         final int index = m.data.indexOf(0x41);
-        if (index >= 0 && m.data.length >= index + 2 + def.bytes) {
+        if (index >= 0 &&
+            m.data.length >= index + 2 + def.bytes &&
+            m.data[index + 1] == pid) {
           values[pid] = PidValue(
             pid: pid,
             value: def.decode(m.data.sublist(index + 2, index + 2 + def.bytes)),
@@ -47,9 +49,7 @@ class ObdService {
   /// Battery voltage as measured by the adapter (`ATRV`), e.g. "14.7V".
   Future<double?> readAdapterVoltage() async {
     final ElmResponse r = await elm.send('ATRV');
-    return double.tryParse(
-      (r.text ?? '').replaceAll(RegExp(r'[^0-9.]'), ''),
-    );
+    return double.tryParse((r.text ?? '').replaceAll(RegExp(r'[^0-9.]'), ''));
   }
 
   /// Reads one GM mode 22 value. Returns null on NO DATA, a negative
@@ -100,13 +100,24 @@ class ObdService {
     return SupportedPids(all);
   }
 
-  Future<List<Dtc>> readDtcs(DtcKind kind) async {
+  Future<List<Dtc>> readDtcs(
+    DtcKind kind, {
+    bool requireResponse = false,
+  }) async {
     final String mode = switch (kind) {
       DtcKind.confirmed => '03',
       DtcKind.pending => '07',
       DtcKind.permanent => '0A',
     };
     final ElmResponse r = await elm.send(mode);
+    if (requireResponse) {
+      final service = int.parse(mode, radix: 16) + 0x40;
+      if (!r.messages.any(
+        (m) => m.data.isNotEmpty && m.data.first == service,
+      )) {
+        throw StateError('El motor no respondió a la consulta de códigos.');
+      }
+    }
     return [
       for (final EcuMessage m in r.messages)
         ...decodeDtcs(
