@@ -90,13 +90,13 @@ Android solo instala una actualización encima de la app si viene firmada con **
 | `ANDROID_KEYSTORE_BASE64` | La llave convertida a texto (base64) |
 | `ANDROID_KEYSTORE_PASSWORD` | Su contraseña |
 
+**En uso: opción A** (desde 2026-11-25): la llave debug de la PC, alias `androiddebugkey`, huella SHA-256 `78:75:35:CE:11:EE:A8:DA:10:C4:0F:D3:D5:F0:5F:DF:BF:8F:D1:9C:FD:F5:96:77:86:D7:ED:12:AF:EB:57:F1`. El original sigue en la PC (`.android\debug.keystore`); conviene guardar una copia en Drive. No va en el repo.
+
 **Opción A — la llave de la PC (si la PC todavía prende):** el APK de GitHub se instala encima de la app actual y no se pierde nada. En PowerShell, en la PC:
 ```powershell
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.android\debug.keystore")) | Set-Clipboard
 ```
 Pegar en `ANDROID_KEYSTORE_BASE64`; en `ANDROID_KEYSTORE_PASSWORD` poner `android`.
-
-**En uso: opción B** (desde 2026-11-25). Llave `aveo`, huella SHA-256 `88:73:9F:B3:B2:C7:C1:B1:2A:C6:52:80:BF:BA:96:44:77:4C:41:08:74:F6:2C:7A:83:29:D9:D8:5F:8E:C0:58`. La copia de respaldo la guarda el usuario (no va en el repo).
 
 **Opción B — llave nueva:** Claude genera una. Hay que **desinstalar la app una vez**: se borran la base de datos y los respaldos internos (antes, compartirlos desde la pestaña Respaldos); los CSV de `Descargas/AveoScanner` se conservan. Guardar una copia de la llave: si se pierde, toca desinstalar otra vez.
 

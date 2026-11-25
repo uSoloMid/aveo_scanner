@@ -24,5 +24,5 @@ Flujo para cada cambio:
 Notas:
 - Este contenedor no puede compilar el APK (`dl.google.com`, de donde sale el SDK de Android, está bloqueado). Sí puede correr analyze y pruebas.
 - Flutter va fijado en **3.47.7** (Dart 3.13.5), el mismo de `.metadata` y del workflow. Si no está instalado: descargar `https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.7-stable.tar.xz`, descomprimir en `/root/sdk` y usar `/root/sdk/flutter/bin/flutter`.
-- La firma usa los secretos `ANDROID_KEYSTORE_BASE64` y `ANDROID_KEYSTORE_PASSWORD` con la llave nueva `aveo` (opción B del README, creada 2026-11-25; el respaldo lo tiene el usuario). No generar otra llave: cambiarla obliga a desinstalar la app y perder sus datos. Sin ellos el workflow compila pero no publica Release. Nunca subir llaves (`*.jks`, `*.keystore`, `key.properties`) al repo.
+- La firma usa los secretos `ANDROID_KEYSTORE_BASE64` y `ANDROID_KEYSTORE_PASSWORD` con la llave debug de la PC del usuario (`androiddebugkey`, opción A del README). No generar otra llave: cambiarla obliga a desinstalar la app y perder sus datos. Sin esos secretos el workflow compila pero no publica Release. Nunca subir llaves (`*.jks`, `*.keystore`, `key.properties`) al repo.
 - Cada sesión nueva de Claude arranca desde `main`: lo que no llegue a `main` no lo verá la siguiente sesión.
