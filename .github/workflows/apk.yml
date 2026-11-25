@@ -1,0 +1,135 @@
+# Compila el APK en cada push y lo publica en Releases para instalarlo desde la tablet.
+# Link fijo a la versión más nueva:
+#   https://github.com/uSoloMid/aveo_scanner/releases/latest/download/aveo_scanner.apk
+name: APK para la tablet
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - 'iphone/**'
+      - '**.md'
+      - 'probar_app.bat'
+  workflow_dispatch:
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  # Misma versión con la que se creó el proyecto (ver .metadata).
+  FLUTTER_VERSION: '3.47.7'
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Paquetes
+        run: flutter pub get
+
+      - name: Revisar el código
+        run: flutter analyze --no-fatal-infos
+
+      - name: Pruebas
+        run: flutter test
+
+      - name: Llave de firma
+        id: firma
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::warning::Faltan los secretos ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD. El APK sale con una llave temporal: no se publica en Releases y no se puede instalar encima de la app actual."
+            echo "fija=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          KS="$RUNNER_TEMP/firma.keystore"
+          # Acepta base64 de PowerShell, de certutil (con encabezados) o de Linux.
+          printf '%s' "$KEYSTORE_B64" | grep -v -- '-----' | tr -d ' \r\n' | base64 --decode > "$KS"
+          if [ -z "$KEY_ALIAS" ]; then
+            KEY_ALIAS=$(keytool -list -keystore "$KS" -storepass "$KEYSTORE_PASSWORD" | awk -F', ' '/PrivateKeyEntry/ {print $1; exit}')
+          fi
+          if [ -z "$KEY_ALIAS" ]; then
+            echo "::error::No se pudo leer la llave (¿contraseña equivocada?)."
+            exit 1
+          fi
+          {
+            echo "storeFile=$KS"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+          } > android/key.properties
+          echo "Firmando con la llave '$KEY_ALIAS'."
+          echo "fija=true" >> "$GITHUB_OUTPUT"
+
+      - name: Compilar APK
+        id: apk
+        run: |
+          # El runner de GitHub tiene menos RAM que la PC.
+          sed -i 's/-Xmx8G/-Xmx4G/; s/-XX:MaxMetaspaceSize=4G/-XX:MaxMetaspaceSize=1G/' android/gradle.properties
+          # 1000 + número de corrida: siempre mayor que las compilaciones de la PC (+5),
+          # así Android lo acepta como actualización.
+          BUILD=$((1000 + GITHUB_RUN_NUMBER))
+          VERSION=$(sed -nE 's/^version:[[:space:]]*([^+[:space:]]+).*/\1/p' pubspec.yaml)
+          flutter build apk --release --build-number="$BUILD"
+          mkdir -p salida
+          cp build/app/outputs/flutter-apk/app-release.apk salida/aveo_scanner.apk
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "### APK $VERSION+$BUILD listo" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aveo_scanner-${{ steps.apk.outputs.version }}+${{ steps.apk.outputs.build }}
+          path: salida/aveo_scanner.apk
+          retention-days: 14
+
+      - name: Publicar en Releases
+        if: steps.firma.outputs.fija == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.apk.outputs.version }}
+          BUILD: ${{ steps.apk.outputs.build }}
+        run: |
+          TAG="build-$BUILD"
+          {
+            echo "**Versión:** $VERSION+$BUILD"
+            echo "**Rama:** \`$GITHUB_REF_NAME\` · commit \`${GITHUB_SHA::7}\`"
+            echo
+            git log -1 --pretty=%B
+            echo
+            echo "Instalar: abrir **aveo_scanner.apk** desde la tablet."
+          } > notas.md
+          gh release create "$TAG" salida/aveo_scanner.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Aveo Scanner $VERSION (build $BUILD)" \
+            --notes-file notas.md \
+            --latest
+          # Conservar solo las 10 compilaciones más recientes.
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("build-"))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName' |
+          while read -r viejo; do
+            gh release delete "$viejo" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          done
+          echo "Descargar: https://github.com/$GITHUB_REPOSITORY/releases/latest/download/aveo_scanner.apk" >> "$GITHUB_STEP_SUMMARY"

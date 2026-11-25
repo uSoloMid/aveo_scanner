@@ -10,17 +10,18 @@ App propia de diagnóstico OBD2 para mi **Chevrolet Aveo 2012 (1.6L, estándar, 
 
 1. [Estado del proyecto](#-estado-del-proyecto)
 2. [Hardware](#-hardware)
-3. [Instalación del entorno (Windows)](#-instalación-del-entorno-windows)
-4. [Crear el proyecto](#-crear-el-proyecto)
-5. [Arquitectura](#-arquitectura)
-6. [Reglas de seguridad (NO NEGOCIABLES)](#-reglas-de-seguridad-no-negociables)
-7. [Cómo hablar con el ELM327](#-cómo-hablar-con-el-elm327)
-8. [PIDs estándar para la v1](#-pids-estándar-para-la-v1)
-9. [Códigos de falla (DTC)](#-códigos-de-falla-dtc)
-10. [Perfil del Aveo (OBDb)](#-perfil-del-aveo-obdb)
-11. [Fases del proyecto](#-fases-del-proyecto)
-12. [Hallazgos de mi Aveo](#-hallazgos-de-mi-aveo)
-13. [Referencias](#-referencias)
+3. [Trabajar desde la tablet (sin PC)](#-trabajar-desde-la-tablet-sin-pc)
+4. [Instalación del entorno (Windows)](#-instalación-del-entorno-windows)
+5. [Crear el proyecto](#-crear-el-proyecto)
+6. [Arquitectura](#-arquitectura)
+7. [Reglas de seguridad (NO NEGOCIABLES)](#-reglas-de-seguridad-no-negociables)
+8. [Cómo hablar con el ELM327](#-cómo-hablar-con-el-elm327)
+9. [PIDs estándar para la v1](#-pids-estándar-para-la-v1)
+10. [Códigos de falla (DTC)](#-códigos-de-falla-dtc)
+11. [Perfil del Aveo (OBDb)](#-perfil-del-aveo-obdb)
+12. [Fases del proyecto](#-fases-del-proyecto)
+13. [Hallazgos de mi Aveo](#-hallazgos-de-mi-aveo)
+14. [Referencias](#-referencias)
 
 ---
 
@@ -57,6 +58,53 @@ Es posible que el **motor** vaya por CAN y el **ABS** por K-Line. Lo confirmamos
 - **No dejarlo conectado** con el carro apagado varios días (drena batería).
 - Si algo se comporta raro (tablero parpadeando, el carro hace cosas extrañas): desconectar y ya.
 - Nada de estar picándole a la app manejando. Que solo muestre datos.
+
+---
+
+## 📱 Trabajar desde la tablet (sin PC)
+
+Desde nov 2026 el proyecto se programa directo desde la tablet con **Claude Code** (app de Claude → Code). Claude cambia el código en la nube, corre las pruebas y lo sube a GitHub; **GitHub Actions compila el APK solo** y lo publica para instalarlo en la misma tablet.
+
+```
+Tablet (Claude Code) → cambio + pruebas → push a GitHub
+   → GitHub Actions: analyze + test + compila (~6-10 min) → Releases
+   → la tablet descarga el APK y lo instala
+```
+
+### Instalar la versión más nueva
+1. En la tablet, con la sesión de GitHub iniciada en el navegador, abrir:
+   **https://github.com/uSoloMid/aveo_scanner/releases/latest/download/aveo_scanner.apk**
+   (guardarlo como favorito o acceso directo en la pantalla de inicio).
+2. Abrir el archivo descargado → **Actualizar** / **Instalar**.
+3. La primera vez Android pide permitir **Instalar apps desconocidas** para el navegador: activarlo.
+4. Si Play Protect avisa "app no reconocida": **Más detalles → Instalar de todas formas**.
+5. En la pantalla de conexión, **Versión de la app 1.2.0+10NN** dice qué compilación quedó (10NN = 1000 + número de compilación de GitHub).
+
+Todas las compilaciones (las últimas 10) están en https://github.com/uSoloMid/aveo_scanner/releases.
+
+### Llave de firma (una sola vez)
+Android solo instala una actualización encima de la app si viene firmada con **la misma llave**. Lo que se instaló desde la PC está firmado con la llave debug de la PC (`C:\Users\<usuario>\.android\debug.keystore`). GitHub necesita una llave fija, guardada en el repo en **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secreto | Valor |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | La llave convertida a texto (base64) |
+| `ANDROID_KEYSTORE_PASSWORD` | Su contraseña |
+
+**Opción A — la llave de la PC (si la PC todavía prende):** el APK de GitHub se instala encima de la app actual y no se pierde nada. En PowerShell, en la PC:
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.android\debug.keystore")) | Set-Clipboard
+```
+Pegar en `ANDROID_KEYSTORE_BASE64`; en `ANDROID_KEYSTORE_PASSWORD` poner `android`.
+
+**Opción B — llave nueva:** Claude genera una. Hay que **desinstalar la app una vez**: se borran la base de datos y los respaldos internos (antes, compartirlos desde la pestaña Respaldos); los CSV de `Descargas/AveoScanner` se conservan. Guardar una copia de la llave: si se pierde, toca desinstalar otra vez.
+
+Sin los secretos, GitHub igual revisa, prueba y compila, pero **no publica** el APK (saldría con una llave temporal que no se instala encima).
+
+### Pruebas
+- Claude corre `flutter analyze` y `flutter test` en la nube antes de subir.
+- GitHub Actions las repite antes de compilar; si fallan, no hay APK nuevo.
+- La prueba real (Bluetooth, carro) es en la tablet.
+- `probar_app.bat` sigue sirviendo si algún día se trabaja desde la PC por USB.
 
 ---
 
