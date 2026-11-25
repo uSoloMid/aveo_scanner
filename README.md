@@ -96,6 +96,8 @@ Android solo instala una actualización encima de la app si viene firmada con **
 ```
 Pegar en `ANDROID_KEYSTORE_BASE64`; en `ANDROID_KEYSTORE_PASSWORD` poner `android`.
 
+**En uso: opción B** (desde 2026-11-25). Llave `aveo`, huella SHA-256 `88:73:9F:B3:B2:C7:C1:B1:2A:C6:52:80:BF:BA:96:44:77:4C:41:08:74:F6:2C:7A:83:29:D9:D8:5F:8E:C0:58`. La copia de respaldo la guarda el usuario (no va en el repo).
+
 **Opción B — llave nueva:** Claude genera una. Hay que **desinstalar la app una vez**: se borran la base de datos y los respaldos internos (antes, compartirlos desde la pestaña Respaldos); los CSV de `Descargas/AveoScanner` se conservan. Guardar una copia de la llave: si se pierde, toca desinstalar otra vez.
 
 Sin los secretos, GitHub igual revisa, prueba y compila, pero **no publica** el APK (saldría con una llave temporal que no se instala encima).
