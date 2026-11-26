@@ -538,7 +538,7 @@ ATSTFF          → timeout máximo
 | PIDs soportados `0100` | |
 | PIDs soportados `0120` | |
 | PIDs soportados `0140` | |
-| Códigos de falla actuales | Ninguno. MIL apagada, todos los monitores completos |
+| Códigos de falla actuales | Oct 2026: ninguno, MIL apagada. **25–26 nov 2026: P0122** (señal baja del sensor de mariposa), confirmado; el 26 también pendiente y MIL encendida |
 | Computadora (ECU) | Delphi MR-140 / HV-240 (motor F16D3), responde en `F1 ← 11` |
 | Inicio de K-Line | El primer comando suele dar `BUS INIT: ERROR`; al segundo intento responde |
 | Módulos que responden | |
@@ -557,6 +557,15 @@ ATSTFF          → timeout máximo
 - La computadora pide ~825 rpm mientras el motor va a ~1470 → entra aire que la ECU no controla.
 - En caliente todo normal (812 pedido / 847 real, IAC 37). Volante, pedal y A/C no lo disparan.
 - Siguiente: registrar con la pestaña **Diagnóstico** para ver si la IAC baja mientras las RPM siguen altas.
+
+### Caso: P0122 y la referencia de "mariposa cerrada" (25–26 nov 2026)
+Registros `aveo_2026-11-25_17-51-27.csv` (ralentí alto toda la prueba) y `aveo_2026-11-26_08-11-23.csv` (en frío, ralentí normal sin tocar nada).
+- Ambos días la ECU tiene **P0122** confirmado (el 26 también pendiente → la falla volvió a detectarse; MIL encendida).
+- La ECU calcula la mariposa **relativa** (`0145`) contra una referencia aprendida de "cerrada". Referencia estimada = mariposa − relativa en reposo.
+- **25 nov:** al dar llave la referencia estaba en **0.78 %** (≈0.04 V, casi 0 V: coincide con una caída de señal tipo P0122). Luego subió poco a poco (1.2 → 7.1 → 5.9 → 8.6 %), siempre por debajo de la lectura real (11.37 %). Relativa en ralentí: mediana 2.8 % (solo 1 de 71 filas en 0). Resultado: avance mediano **32.5°**, RPM medianas **+526** sobre lo pedido (52 de 71 filas con más de 300 rpm arriba), aun con el motor caliente (90 °C). Con llave ON y motor apagado la mariposa cruda brincó entre 7.84 y 11.37 % sin pisar el pedal.
+- **26 nov:** referencia = 11.37 % = lectura real → relativa **0 %** en las 14 filas de ralentí. Avance mediano **5°**, RPM medianas **+19** sobre lo pedido. Mariposa cruda estable en 11.37 % con llave ON.
+- Trims de combustible normales ambos días (largo −7 a +8 %): no apunta a una entrada de aire falso; el ralentí alto se explica porque la ECU no reconoce la mariposa como cerrada y no entra a control de ralentí.
+- Sospecha principal: **circuito del sensor de mariposa (TPS)** con caídas intermitentes de voltaje (sensor desgastado, conector o cable). Falta confirmarlo con multímetro: llave ON, ~0.5–0.6 V cerrada, subida suave hasta ~4.5 V, y mover el cableado buscando caídas.
 
 ---
 
