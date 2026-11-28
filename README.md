@@ -566,6 +566,7 @@ Registros `aveo_2026-11-25_17-51-27.csv` (ralentí alto toda la prueba) y `aveo_
 - **26 nov:** referencia = 11.37 % = lectura real → relativa **0 %** en las 14 filas de ralentí. Avance mediano **5°**, RPM medianas **+19** sobre lo pedido. Mariposa cruda estable en 11.37 % con llave ON.
 - Trims de combustible normales ambos días (largo −7 a +8 %): no apunta a una entrada de aire falso; el ralentí alto se explica porque la ECU no reconoce la mariposa como cerrada y no entra a control de ralentí.
 - Sospecha principal: **circuito del sensor de mariposa (TPS)** con caídas intermitentes de voltaje (sensor desgastado, conector o cable). Falta confirmarlo con multímetro: llave ON, ~0.5–0.6 V cerrada, subida suave hasta ~4.5 V, y mover el cableado buscando caídas.
+- **28 nov:** al desconectar el conector del TPS (3 terminales, empaque morado) se vio un **hilo de cobre suelto** enredado en una terminal y otra terminal **ennegrecida** (sulfato/suciedad). Coincide con la sospecha. Después de desconectarlo costó volver a conectarlo.
 
 ---
 
